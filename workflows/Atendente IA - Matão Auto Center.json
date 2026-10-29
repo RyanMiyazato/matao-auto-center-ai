@@ -1,0 +1,1927 @@
+{
+  "name": "Atendente IA - Matão Auto Center - Refatorado",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "atendimento",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -256,
+        64
+      ],
+      "id": "731dc48c-1cd9-4e9c-b241-b5be6fcc3847",
+      "name": "Webhook",
+      "webhookId": "baba15af-c03e-4b37-a9f2-7f5b9f741639"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO clientes (\n    empresa_id,\n    nome,\n    telefone\n)\nVALUES ($1, $2, $3)\n\nON CONFLICT (empresa_id, telefone)\n\nDO UPDATE SET\n    nome = EXCLUDED.nome\n\nRETURNING id, empresa_id, nome, telefone;",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Interpretar JSON\"].json.empresa_id}}\n\n$2 = {{$node[\"Interpretar JSON\"].json.nome}}\n\n$3 = {{$node[\"Interpretar JSON\"].json.telefone}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1424,
+        -16
+      ],
+      "id": "da1ea2ee-e6d1-480b-a1c3-c4c9a953168b",
+      "name": "Cadastrar cliente",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO mensagens (\n    cliente_id,\n    papel,\n    conteudo,\n    servico\n)\nVALUES (\n    $1,\n    'user',\n    $2,\n    $3\n)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Cadastrar cliente\"].json.id}}\n$2 = {{$node[\"Interpretar JSON\"].json.mensagem}}\n$3 = {{$node[\"Resolver contexto\"].json.servico}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2096,
+        -16
+      ],
+      "id": "53aaf6a1-ded2-4882-9b06-547f298479cb",
+      "name": "Salvar mensagem cliente",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT nome, preco\nFROM servicos\nWHERE nome = $1\nAND ativo = TRUE\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{$node[\"Resolver contexto\"].json.servico}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2768,
+        -16
+      ],
+      "id": "fd007c3e-dae2-4115-a8f4-db4ac9a889b2",
+      "name": "Buscar serviço",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT papel, conteudo\nFROM mensagens\nWHERE cliente_id = $1\nORDER BY criado_em DESC\nLIMIT 10;",
+        "options": {
+          "queryReplacement": "={{$node[\"Cadastrar cliente\"].json.id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2320,
+        -16
+      ],
+      "id": "08100c3f-8449-4ba6-a496-aa95628a7130",
+      "name": "Buscar histórico",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const mensagens = $input.all().reverse();\n\nconst historico = mensagens\n  .map(item => `${item.json.papel}: ${item.json.conteudo}`)\n  .join('\\n');\n\nreturn [\n  {\n    json: {\n      historico\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2544,
+        -16
+      ],
+      "id": "2b1f74dc-600d-4e78-b08f-c61b7ccc50f4",
+      "name": "Montar histórico"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT (\n    SELECT m.servico\n    FROM mensagens m\n    JOIN clientes c ON c.id = m.cliente_id\n    WHERE m.cliente_id = $1\n      AND c.empresa_id = $2\n      AND m.servico IS NOT NULL\n    ORDER BY m.criado_em DESC\n    LIMIT 1\n) AS servico;",
+        "options": {
+          "queryReplacement": "=$1 {{$node[\"Cadastrar cliente\"].json.id}}\n$2 {{$node[\"Interpretar JSON\"].json.empresa_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1648,
+        -16
+      ],
+      "id": "e23d98f4-4dd9-4ef8-a188-2ddb4e4e5d9c",
+      "name": "Buscar último serviço",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const atual = $(\"Interpretar JSON\").first().json;\n\nconst servicoAtual = atual.servico;\n\nlet ultimoServico = null;\n\nif ($input.first()?.json?.servico) {\n  ultimoServico = $input.first().json.servico;\n}\n\nconst servicoFinal = servicoAtual || ultimoServico;\n\nreturn [{\n  json: {\n    nome: atual.nome,\n    telefone: atual.telefone,\n    mensagem: atual.mensagem,\n    intencao: atual.intencao,\n    servico: servicoFinal,\n    data: atual.data,\n    horario: atual.horario\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        -16
+      ],
+      "id": "bec2770e-53a3-45dc-8ec2-06b6f9db3c63",
+      "name": "Resolver contexto"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.intencao}}",
+                    "rightValue": "PRECO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "c156cc13-c634-42d5-a8a2-c1dd9c6328b7"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PRECO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "717ac3c7-7af5-49a3-aae0-b43b062cbda6",
+                    "leftValue": "={{$json.intencao}}",
+                    "rightValue": "HORARIO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "HORARIO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b69917af-ee02-42d3-b7b1-2f2d16e68817",
+                    "leftValue": "={{$json.intencao}}",
+                    "rightValue": "AGENDAMENTO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "AGENDAMENTO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e8a142b4-86d4-4574-aabc-19b3dbb9fabd",
+                    "leftValue": "={{$json.intencao}}",
+                    "rightValue": "SERVICOS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "SERVICOS"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "babf247e-ef77-44f4-9354-d244eb182026",
+                    "leftValue": "={{$json.intencao}}",
+                    "rightValue": "HUMANO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "HUMANO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1f69c8b8-3f16-47db-9292-3116fdaf0f47",
+                    "leftValue": "={{$json.intencao}}",
+                    "rightValue": "OUTRO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "OUTRO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9cdbd8bb-9c8a-442c-bcb9-736d2e7336da",
+                    "leftValue": "={{$json.intencao}}",
+                    "rightValue": "ENDERECO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ENDERECO"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "fdc0104f-2ff4-4e5a-9a4c-c3c90c45f47a",
+      "name": "Direcionar atendimento"
+    },
+    {
+      "parameters": {
+        "jsCode": "const dados = $(\"Resolver contexto conversa\").first().json;\n\nlet horario = dados.horario;\nlet data = dados.data;\n\n// Texto original\nconst texto = dados.mensagem\n  .toLowerCase()\n  .normalize(\"NFD\")\n  .replace(/[\\u0300-\\u036f]/g, \"\");\n\n// Horário: 17:00 -> 17:00:00\nif (horario && horario.length === 5) {\n  horario = `${horario}:00`;\n}\n\n// Data/hora atual em São Paulo\nconst hoje = DateTime.now()\n  .setZone(\"America/Sao_Paulo\")\n  .startOf(\"day\");\n\n// ========================================\n// DATA DETERMINÍSTICA\n// ========================================\n\n// HOJE\nif (/\\bhoje\\b/.test(texto)) {\n  data = hoje.toISODate();\n}\n\n// AMANHÃ\nelse if (/\\bamanha\\b/.test(texto)) {\n  data = hoje.plus({ days: 1 }).toISODate();\n}\n\n// DIAS DA SEMANA\nelse {\n  const diasSemana = {\n    \"domingo\": 7,\n    \"segunda\": 1,\n    \"segunda-feira\": 1,\n    \"terca\": 2,\n    \"terca-feira\": 2,\n    \"quarta\": 3,\n    \"quarta-feira\": 3,\n    \"quinta\": 4,\n    \"quinta-feira\": 4,\n    \"sexta\": 5,\n    \"sexta-feira\": 5,\n    \"sabado\": 6\n  };\n\n  let diaEncontrado = null;\n\n  for (const [nome, numero] of Object.entries(diasSemana)) {\n    if (texto.includes(nome)) {\n      diaEncontrado = numero;\n      break;\n    }\n  }\n\n  if (diaEncontrado !== null) {\n    let diferenca = diaEncontrado - hoje.weekday;\n\n    // Se for hoje ou um dia já passado nesta semana,\n    // considera a próxima ocorrência.\n    if (diferenca <= 0) {\n      diferenca += 7;\n    }\n\n    data = hoje.plus({ days: diferenca }).toISODate();\n  }\n}\n\n// Se veio da IA como \"2026-08-29 17:00\",\n// mantém só YYYY-MM-DD\nif (data) {\n  data = String(data).substring(0, 10);\n}\n\nreturn [{\n  json: {\n    empresa_id: dados.empresa_id,\n    nome: dados.nome,\n    telefone: dados.telefone,\n    mensagem: dados.mensagem,\n    servico: dados.servico,\n    data,\n    horario\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        448
+      ],
+      "id": "0a0d83f3-8904-47b7-81d5-a8218857c7bb",
+      "name": "Preparar agendamento"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "555a3223-2439-4457-b7fa-500a176a52f3",
+              "leftValue": "={{$json.servico}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d993fb8e-c700-47d2-aa0d-620b4fe98e51",
+              "leftValue": "={{$json.data}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "f2492d47-dc54-4fed-b18b-ec8a8025349a",
+              "leftValue": "={{$json.horario}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1584,
+        448
+      ],
+      "id": "f075617e-8c02-4d17-a5fb-7965e5163100",
+      "name": "Dados completos?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO clientes (\n    empresa_id,\n    nome,\n    telefone\n)\nVALUES ($1, $2, $3)\n\nON CONFLICT (empresa_id, telefone)\n\nDO UPDATE SET\n    nome = EXCLUDED.nome\n\nRETURNING id, empresa_id, nome, telefone;",
+        "options": {
+          "queryReplacement": "=$1 {{ $(\"Interpretar JSON\").first().json.empresa_id }}\n$2 {{$node[\"Preparar agendamento\"].json.nome}}\n$3 {{$node[\"Preparar agendamento\"].json.telefone}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1808,
+        384
+      ],
+      "id": "14d9dd14-3538-4a3e-8e85-379004214389",
+      "name": "Cliente agendamento",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, nome, preco, duracao_minutos\nFROM servicos\nWHERE nome = $1\nAND empresa_id = $2\nAND ativo = TRUE\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Preparar agendamento\"].json.servico}}\n$2 = {{$node[\"Preparar agendamento\"].json.empresa_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2032,
+        384
+      ],
+      "id": "c54e4c33-1f3d-4b52-a815-7a92565b02e9",
+      "name": "Buscar serviço agendamento",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO agendamentos (\n    cliente_id,\n    servico_id,\n    recurso_id,\n    data,\n    horario,\n    status\n)\nVALUES (\n    $1,\n    $2,\n    $3,\n    $4::date,\n    $5::time,\n    'agendado'\n)\nRETURNING\n    id,\n    cliente_id,\n    servico_id,\n    recurso_id,\n    data,\n    horario,\n    status;",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Cliente agendamento\"].json.id}}\n$2 = {{$node[\"Buscar serviço agendamento\"].json.id}}\n$3 = {{$node[\"Buscar recurso disponível\"].json.id}}\n$4 = {{$node[\"Preparar agendamento\"].json.data}}\n$5 = {{$node[\"Preparar agendamento\"].json.horario}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3744,
+        336
+      ],
+      "id": "075bcb39-3a39-4d19-90d1-3de7ffa3cae8",
+      "name": "Criar agendamento",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT nome, preco\nFROM servicos\nWHERE ativo = TRUE\nORDER BY nome;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1360,
+        784
+      ],
+      "id": "629ed24b-01ad-492c-805e-b7ef37a49caf",
+      "name": "Listar serviços",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const itens = $input.all();\n\nconst lista = itens.map(item => {\n  const nome = item.json.nome;\n  const preco = Number(item.json.preco)\n    .toFixed(2)\n    .replace('.', ',');\n\n  return `• ${nome}: R$ ${preco}`;\n}).join('\\n');\n\nreturn [{\n  json: {\n    resposta: `Atualmente temos os seguintes serviços:\\n\\n${lista}\\n\\nSe quiser, posso te ajudar com algum deles.`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        784
+      ],
+      "id": "5419d677-986f-45dc-bf60-d0b1b2bed924",
+      "name": "Montar lista serviços"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    nome: $json.body.nome,\n    telefone: $json.body.telefone,\n    mensagem: $json.body.mensagem,\n    status: \"aguardando_humano\",\n    resposta: \"Claro! Vou registrar sua solicitação para que um atendente humano possa continuar o atendimento.\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        1008
+      ],
+      "id": "5e2ed219-524b-4a16-913c-66b3c722b123",
+      "name": "Preparar atendimento humano"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO atendimentos_humanos (\n    cliente_id,\n    mensagem,\n    status\n)\nVALUES (\n    $1,\n    $2,\n    'aguardando'\n)\nRETURNING id, status;",
+        "options": {
+          "queryReplacement": "=$1 {{$node[\"Cliente - Humano\"].json.id}}\n$2 {{$node[\"Preparar atendimento humano\"].json.mensagem}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1808,
+        1008
+      ],
+      "id": "be202bff-e0fc-4a0d-bd4c-25b67e99bd12",
+      "name": "Registrar solicitação humana",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO clientes (\n    empresa_id,\n    nome,\n    telefone\n)\nVALUES ($1, $2, $3)\n\nON CONFLICT (empresa_id, telefone)\n\nDO UPDATE SET\n    nome = EXCLUDED.nome\n\nRETURNING id, empresa_id, nome, telefone;",
+        "options": {
+          "queryReplacement": "=$1 {{$node[\"Interpretar JSON\"].json.empresa_id}}\n$2 {{$node[\"Preparar atendimento humano\"].json.nome}}\n$3 {{$node[\"Preparar atendimento humano\"].json.telefone}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1584,
+        1008
+      ],
+      "id": "459db872-bf98-43ce-b86c-63e9a8dd794a",
+      "name": "Cliente - Humano",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n{\n  \"resposta\": $(\"Preparar atendimento humano\").first().json.resposta\n}\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2032,
+        1008
+      ],
+      "id": "9f540293-5eda-44fd-995f-22f34ead5bfc",
+      "name": "Responder cliente"
+    },
+    {
+      "parameters": {
+        "jsCode": "const empresa = $(\"Buscar empresa\").first().json;\nconst cliente = $(\"Interpretar JSON\").first().json;\n\nconst prompt = `Você é o atendente virtual da ${empresa.nome}.\n\nHORÁRIOS OFICIAIS DA EMPRESA:\n\nSegunda a sexta: ${empresa.horario_segunda_sexta}\nSábado: ${empresa.horario_sabado}\nDomingo: ${empresa.horario_domingo}\n\nPERGUNTA DO CLIENTE:\n${cliente.mensagem}\n\nREGRAS:\n- Responda diretamente à pergunta.\n- Utilize somente os horários acima.\n- Não invente horários.\n- Não diga que não possui as informações, pois elas estão fornecidas acima.\n- Seja curto e natural.\n- Não se apresente.\n\nResponda somente ao cliente.`;\n\nreturn [{\n  json: {\n    prompt,\n    rota: \"HORARIO\",\n    salvarHistorico: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        144
+      ],
+      "id": "56625a8f-1761-4cb1-ab49-0ded6f8343fb",
+      "name": "Preparar Prompt - Horário"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n  \"model\": \"llama3.2\",\n  \"prompt\": $json.prompt,\n  \"stream\": false\n}\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        6240,
+        576
+      ],
+      "id": "9ae79ad2-9197-40c1-a7a1-3ee442ffdb4e",
+      "name": "IA Central - Ollama"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entradaIA = $(\"IA Central - Ollama\").first().json;\n\n// Descobre qual node de preparação executou nesta rota\nlet rota = null;\nlet salvarHistorico = false;\n\nconst candidatos = [\n  \"Preparar Prompt - Preço\",\n  \"Preparar Prompt - Horário\",\n  \"Preparar Prompt - Serviços\",\n  \"Preparar Prompt - Geral\",\n  \"Preparar Prompt - Pedir dados\",\n  \"Preparar Prompt - Horário ocupado\",\n  \"Preparar Prompt - Confirmar agendamento\"\n];\n\nfor (const nome of candidatos) {\n  try {\n    const dados = $(nome).first().json;\n\n    if (dados?.rota) {\n      rota = dados.rota;\n      salvarHistorico = dados.salvarHistorico === true;\n    }\n  } catch {\n    // node não executou nesta rota\n  }\n}\n\nreturn [{\n  json: {\n    resposta: entradaIA.response,\n    rota,\n    salvarHistorico\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6464,
+        576
+      ],
+      "id": "3708d65e-765e-47e2-aa06-01f7c7e2b635",
+      "name": "Padronizar resposta"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n{\n  \"resposta\": $json.resposta\n}\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        7456,
+        544
+      ],
+      "id": "c3259907-069a-4dc3-8300-ce3614f31607",
+      "name": "Resposta Final"
+    },
+    {
+      "parameters": {
+        "jsCode": "const empresa = $(\"Buscar empresa\").first().json;\nconst cliente = $(\"Interpretar JSON\").first().json;\n\nconst prompt = `Você é o atendente virtual da ${empresa.nome}.\n\nINFORMAÇÕES DA EMPRESA:\n\nDescrição:\n${empresa.descricao}\n\nHorário de segunda a sexta:\n${empresa.horario_segunda_sexta}\n\nHorário de sábado:\n${empresa.horario_sabado}\n\nDomingo:\n${empresa.horario_domingo}\n\nTelefone:\n${empresa.telefone}\n\nEndereço:\n${empresa.endereco}\n\nMENSAGEM DO CLIENTE:\n${cliente.mensagem}\n\nREGRAS:\n- Responda de maneira natural e educada.\n- Não invente informações.\n- Se a informação não estiver disponível, diga que pode encaminhar para um atendente humano.\n- Não afirme que executou ações que não foram realmente executadas.\n\nResponda somente ao cliente.`;\n\nreturn [{\n  json: {\n    prompt,\n    rota: \"OUTRO\",\n    salvarHistorico: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        1296
+      ],
+      "id": "0456009b-fa11-4740-8718-9404ebc45799",
+      "name": "Preparar Prompt - Geral"
+    },
+    {
+      "parameters": {
+        "jsCode": "const empresa = $(\"Buscar empresa\").first().json;\n\nconst servico = $json.nome;\n\nconst preco = Number($json.preco)\n  .toFixed(2)\n  .replace('.', ',');\n\nconst cliente = $(\"Resolver contexto\").first().json;\n\nlet historico = \"\";\n\ntry {\n  historico = $(\"Montar histórico\").first().json.historico;\n} catch {\n  historico = \"\";\n}\n\nconst prompt = `Você é o atendente virtual da ${empresa.nome}.\n\nHISTÓRICO:\n${historico}\n\nSERVIÇO:\n${servico}\n\nPREÇO OFICIAL:\nR$ ${preco}\n\nMENSAGEM:\n${cliente.mensagem}\n\nREGRAS:\n- Responda diretamente.\n- Use exatamente o preço informado.\n- Não invente valores.\n- Não altere o preço.\n- Seja curto e natural.\n\nResponda somente ao cliente.`;\n\nreturn [{\n  json: {\n    prompt,\n    rota: \"PRECO\",\n    salvarHistorico: true\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2992,
+        -16
+      ],
+      "id": "5f0a6a4c-388d-4be1-ada3-6b07bc30dddd",
+      "name": "Preparar Prompt - Preço"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0c02a73a-b595-49eb-8b7f-655994915793",
+              "leftValue": "={{$json.salvarHistorico}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6688,
+        576
+      ],
+      "id": "271075ff-266c-4f91-a96e-c7ca7d87e622",
+      "name": "Salvar no histórico?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO mensagens (\n    cliente_id,\n    papel,\n    conteudo\n)\nVALUES (\n    $1,\n    'assistant',\n    $2\n)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "=$1 {{$node[\"Cadastrar cliente\"].json.id}}\n$2 {{$node[\"Padronizar resposta\"].json.resposta}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        6912,
+        448
+      ],
+      "id": "043c6f51-6f6b-4ed1-9f97-35b3b59df101",
+      "name": "Salvar resposta no histórico",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const dados = $(\"Preparar agendamento\").first().json;\n\nconst faltando = [];\n\nif (!dados.servico) faltando.push(\"serviço\");\nif (!dados.data) faltando.push(\"data\");\nif (!dados.horario) faltando.push(\"horário\");\n\nconst prompt = `Você é o atendente virtual da Matão Auto Center.\n\nO cliente quer realizar um agendamento.\n\nDADOS IDENTIFICADOS:\nServiço: ${dados.servico || \"não informado\"}\nData: ${dados.data || \"não informada\"}\nHorário: ${dados.horario || \"não informado\"}\n\nMENSAGEM DO CLIENTE:\n${dados.mensagem}\n\nINFORMAÇÕES QUE ESTÃO FALTANDO:\n${faltando.join(\", \")}\n\nREGRAS:\n- Peça SOMENTE as informações que estão faltando.\n- Não peça novamente informações que já foram fornecidas.\n- Seja curto, natural e educado.\n- Não diga que o agendamento foi realizado.\n- Não invente datas ou horários.\n\nResponda somente ao cliente.`;\n\nreturn [{\n  json: {\n    prompt,\n    rota: \"AGENDAMENTO_DADOS\",\n    salvarHistorico: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        560
+      ],
+      "id": "5ce97f8e-c2b8-4aba-a2fc-4ba0066e305e",
+      "name": "Preparar Prompt - Pedir dados"
+    },
+    {
+      "parameters": {
+        "jsCode": "const dados = $(\"Preparar agendamento\").first().json;\nconst sugestoes = $(\"Montar horários sugeridos\").first().json;\nconst empresa = $(\"Buscar empresa\").first().json;\n\nconst prompt = `Você é o atendente virtual da ${empresa.nome}.\n\nO cliente tentou agendar:\n\nServiço: ${dados.servico}\nData: ${dados.data}\nHorário solicitado: ${dados.horario}\n\nEsse horário está ocupado.\n\nHORÁRIOS LIVRES:\n${sugestoes.textoHorarios || \"nenhum horário disponível encontrado\"}\n\nREGRAS:\n- Informe que o horário solicitado está ocupado.\n- Sugira somente os horários fornecidos acima.\n- Não invente horários.\n- Não diga que um novo horário foi agendado.\n- Pergunte qual horário o cliente prefere.\n- Seja curto e natural.\n\nResponda somente ao cliente.`;\n\nreturn [{\n  json: {\n    prompt,\n    rota: \"AGENDAMENTO_OCUPADO\",\n    salvarHistorico: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4608,
+        528
+      ],
+      "id": "df0a1f57-879c-45d7-a5c9-cdd4989bd58a",
+      "name": "Preparar Prompt - Horário ocupado"
+    },
+    {
+      "parameters": {
+        "jsCode": "const empresa = $(\"Buscar empresa\").first().json;\nconst dados = $(\"Preparar agendamento\").first().json;\nconst agendamento = $(\"Criar agendamento\").first().json;\n\nconst prompt = `Você é o atendente virtual da ${empresa.nome}.\n\nO sistema CONFIRMOU e REGISTROU este agendamento no banco de dados.\n\nCliente: ${dados.nome}\nServiço: ${dados.servico}\nData: ${agendamento.data || dados.data}\nHorário: ${agendamento.horario || dados.horario}\nStatus: ${agendamento.status || \"agendado\"}\n\nREGRAS:\n- O agendamento FOI realizado.\n- Confirme isso claramente ao cliente.\n- Informe o serviço, a data e o horário.\n- Não diga que houve erro.\n- Não invente informações.\n- Seja curto, natural e educado.\n\nResponda somente ao cliente.`;\n\nreturn [{\n  json: {\n    prompt,\n    rota: \"AGENDAMENTO_CONFIRMADO\",\n    salvarHistorico: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4144,
+        336
+      ],
+      "id": "bed0c363-2985-42c3-ad48-125ae25ed497",
+      "name": "Preparar Prompt - Confirmar agendamento"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n  \"model\": \"llama3.2\",\n  \"prompt\": `Analise a mensagem de um cliente da Matão Auto Center.\n\nDATA ATUAL:\n${$now.toFormat(\"yyyy-MM-dd\")}\n\nSERVIÇOS VÁLIDOS:\n- Troca de óleo\n- Alinhamento\n- Balanceamento\n- Troca de pneus\n- Manutenção de freios\n\nINTENÇÕES VÁLIDAS:\n- PRECO\n- HORARIO\n- SERVICOS\n- AGENDAMENTO\n- HUMANO\n- ENDERECO\n- OUTRO\n\nMENSAGEM DO CLIENTE:\n${$json.body.mensagem}\n\nSua tarefa é APENAS classificar e extrair informações.\n\nREGRAS:\n\n1. \"Quanto custa\", \"valor\", \"preço\", \"quanto fica\" = PRECO.\n2. Perguntas sobre abertura, fechamento ou funcionamento = HORARIO.\n3. Perguntas sobre quais serviços existem = SERVICOS.\n4. Pedido para marcar, agendar ou verificar disponibilidade = AGENDAMENTO.\n5. Pedido para falar com pessoa ou atendente = HUMANO.\n6. Saudações, agradecimentos e assuntos não classificados = OUTRO.\n7. O campo servico só pode conter um dos serviços válidos.\n8. Se nenhum serviço puder ser identificado, use null.\n9. Perguntas como \"onde vocês ficam?\", \"qual o endereço?\", \"onde fica a loja?\", \"localização\" = ENDERECO.\n10. Converta \"amanhã\" para a data correta considerando a DATA ATUAL.\n11. Datas devem estar em YYYY-MM-DD.\n12. Horários devem estar em HH:mm.\n13. Não invente informações.\n14. Retorne SOMENTE JSON válido.\n15. Não use markdown.\n16. Se a mensagem contiver horários como \"17h\", \"17 horas\", \"17:00\" ou \"às 17\", converta para \"17:00\".\n17. Nunca retorne horario = null se houver um horário explícito na mensagem.\n18. Não explique sua resposta.\n\nFormato obrigatório:\n\n{\n  \"intencao\": \"PRECO\",\n  \"servico\": \"Troca de óleo\",\n  \"data\": null,\n  \"horario\": null\n}`,\n  \"stream\": false,\n  \"format\": \"json\"\n}\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -32,
+        64
+      ],
+      "id": "a562f19a-2d19-4082-ae91-75122fb9b1fb",
+      "name": "IA - Interpretar mensagem"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resposta = $json.response;\n\nlet dados;\n\ntry {\n  dados = JSON.parse(resposta);\n} catch {\n  dados = {\n    intencao: \"OUTRO\",\n    servico: null,\n    data: null,\n    horario: null\n  };\n}\n\nconst webhook = $(\"Webhook\").first().json.body;\n\nconst mensagemOriginal = webhook.mensagem;\n\nconst texto = mensagemOriginal\n  .toLowerCase()\n  .normalize(\"NFD\")\n  .replace(/[\\u0300-\\u036f]/g, \"\")\n  .trim();\n\n\n// ========================================\n// 1. INTENÇÃO\n// ========================================\n\nconst intencoesValidas = [\n  \"PRECO\",\n  \"HORARIO\",\n  \"SERVICOS\",\n  \"AGENDAMENTO\",\n  \"HUMANO\",\n  \"ENDERECO\",\n  \"OUTRO\"\n];\n\nif (!intencoesValidas.includes(dados.intencao)) {\n  dados.intencao = \"OUTRO\";\n}\n\n\n// ========================================\n// 2. FALLBACK DETERMINÍSTICO DE INTENÇÃO\n// ========================================\n\n// PREÇO\nif (\n  texto.includes(\"quanto custa\") ||\n  texto.includes(\"qual o preco\") ||\n  texto.includes(\"qual o valor\") ||\n  texto.includes(\"quanto fica\") ||\n  texto.includes(\"preco do\") ||\n  texto.includes(\"valor do\")\n) {\n  dados.intencao = \"PRECO\";\n}\n\n// LISTAR SERVIÇOS\nelse if (\n  texto.includes(\"quais servicos\") ||\n  texto.includes(\"que servicos\") ||\n  texto.includes(\"quais os servicos\") ||\n  texto.includes(\"o que voces fazem\")\n) {\n  dados.intencao = \"SERVICOS\";\n}\n\n// HORÁRIO DE FUNCIONAMENTO\nelse if (\n  texto.includes(\"abre sabado\") ||\n  texto.includes(\"abrem sabado\") ||\n  texto.includes(\"funciona sabado\") ||\n  texto.includes(\"horario de funcionamento\") ||\n  texto.includes(\"que horas abre\") ||\n  texto.includes(\"que horas fecha\") ||\n  texto.includes(\"qual o horario\")\n) {\n  dados.intencao = \"HORARIO\";\n}\n\n// ENDEREÇO\nelse if (\n  texto.includes(\"onde voces ficam\") ||\n  texto.includes(\"onde fica\") ||\n  texto.includes(\"qual o endereco\") ||\n  texto.includes(\"localizacao\")\n) {\n  dados.intencao = \"ENDERECO\";\n}\n\n// HUMANO\nelse if (\n  texto.includes(\"falar com atendente\") ||\n  texto.includes(\"falar com uma pessoa\") ||\n  texto.includes(\"falar com alguem\") ||\n  texto.includes(\"atendente humano\")\n) {\n  dados.intencao = \"HUMANO\";\n}\n\n// AGENDAMENTO\nelse if (\n  texto.includes(\"quero agendar\") ||\n  texto.includes(\"gostaria de agendar\") ||\n  texto.includes(\"quero marcar\") ||\n  texto.includes(\"marcar um horario\") ||\n  texto.includes(\"agendamento\")\n) {\n  dados.intencao = \"AGENDAMENTO\";\n}\n\n\n// ========================================\n// 3. SERVIÇO\n// ========================================\n\nconst servicosValidos = [\n  \"Troca de óleo\",\n  \"Alinhamento\",\n  \"Balanceamento\",\n  \"Troca de pneus\",\n  \"Manutenção de freios\"\n];\n\nif (!servicosValidos.includes(dados.servico)) {\n  dados.servico = null;\n}\n\nif (!dados.servico) {\n\n  if (\n    texto.includes(\"alinhamento\") ||\n    texto.includes(\"alinhar\")\n  ) {\n    dados.servico = \"Alinhamento\";\n  }\n\n  else if (\n    texto.includes(\"troca de oleo\") ||\n    texto.includes(\"trocar oleo\") ||\n    texto.includes(\"oleo\")\n  ) {\n    dados.servico = \"Troca de óleo\";\n  }\n\n  else if (\n    texto.includes(\"balanceamento\") ||\n    texto.includes(\"balancear\")\n  ) {\n    dados.servico = \"Balanceamento\";\n  }\n\n  else if (\n    texto.includes(\"pneu\") ||\n    texto.includes(\"pneus\")\n  ) {\n    dados.servico = \"Troca de pneus\";\n  }\n\n  else if (\n    texto.includes(\"freio\") ||\n    texto.includes(\"pastilha\")\n  ) {\n    dados.servico = \"Manutenção de freios\";\n  }\n}\n\n\n// ========================================\n// 4. HORÁRIO\n// ========================================\n\n// Importante:\n// não confiamos em horário inventado pela IA.\n// Só aceitamos se existir horário no texto original.\n\nconst matchHorario = texto.match(\n  /\\b([01]?\\d|2[0-3])(?::([0-5]\\d)|h(?:([0-5]\\d))?)\\b/\n);\n\nif (matchHorario) {\n\n  const hora = matchHorario[1].padStart(2, \"0\");\n\n  const minuto =\n    matchHorario[2] ||\n    matchHorario[3] ||\n    \"00\";\n\n  dados.horario = `${hora}:${minuto}`;\n\n} else {\n\n  dados.horario = null;\n\n}\n\n\n// ========================================\n// RESULTADO\n// ========================================\n\nreturn [{\n  json: {\n    empresa_id: 1,\n\n    nome: webhook.nome,\n    telefone: webhook.telefone,\n    mensagem: webhook.mensagem,\n\n    intencao: dados.intencao,\n    servico: dados.servico,\n    data: dados.data || null,\n    horario: dados.horario\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        64
+      ],
+      "id": "4692c84c-d8cb-4efc-9a7f-cb6a93654495",
+      "name": "Interpretar JSON"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT *\nFROM empresa\nWHERE id = 1\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        416,
+        64
+      ],
+      "id": "d22f4b7a-582a-4f14-8e25-7e250ac3a1c3",
+      "name": "Buscar empresa",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const empresa = $(\"Buscar empresa\").first().json;\n\nreturn [{\n  json: {\n    resposta: `Nós ficamos em ${empresa.endereco}.`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        1504
+      ],
+      "id": "84c0350c-9a7d-4335-9cbf-6dfa8cd3c131",
+      "name": "Preparar resposta - Endereço"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resposta = $(\"Padronizar resposta\").first().json.resposta;\n\nreturn [{\n  json: {\n    resposta\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7136,
+        448
+      ],
+      "id": "788b68ad-58e8-4768-96d5-61569e977a44",
+      "name": "Restaurar resposta"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH parametros AS (\n    SELECT\n        $1::date AS data_agendamento,\n        $2::int AS empresa_id,\n        $3::time AS horario_solicitado,\n        $4::int AS duracao_minutos,\n        $5::int AS servico_id\n),\n\nexpediente AS (\n    SELECT\n        p.*,\n        he.abertura,\n        he.fechamento,\n        he.ativo\n\n    FROM parametros p\n\n    LEFT JOIN horarios_empresa he\n        ON he.empresa_id = p.empresa_id\n       AND he.dia_semana =\n           EXTRACT(DOW FROM p.data_agendamento)::int\n),\n\nhorarios AS (\n    SELECT\n        e.*,\n        gs::time AS horario\n\n    FROM expediente e\n\n    CROSS JOIN LATERAL generate_series(\n        e.data_agendamento + e.abertura,\n        e.data_agendamento + e.fechamento,\n        INTERVAL '30 minutes'\n    ) AS gs\n\n    WHERE e.ativo = TRUE\n      AND e.abertura IS NOT NULL\n      AND e.fechamento IS NOT NULL\n),\n\nhorarios_validos AS (\n    SELECT *\n    FROM horarios\n\n    WHERE horario > horario_solicitado\n\n      AND (\n          horario\n          + make_interval(mins => duracao_minutos)\n      ) <= fechamento\n),\n\nhorarios_sem_bloqueio AS (\n    SELECT hv.*\n\n    FROM horarios_validos hv\n\n    WHERE NOT EXISTS (\n        SELECT 1\n\n        FROM bloqueios_agenda b\n\n        WHERE b.empresa_id = hv.empresa_id\n          AND b.data = hv.data_agendamento\n\n          AND (\n              b.dia_inteiro = TRUE\n\n              OR\n\n              (\n                  hv.horario < b.horario_fim\n\n                  AND\n\n                  hv.horario\n                  + make_interval(mins => hv.duracao_minutos)\n                  > b.horario_inicio\n              )\n          )\n    )\n)\n\nSELECT\n    h.horario,\n\n    (\n        SELECT r.id\n\n        FROM recursos r\n\n        JOIN servico_recursos sr\n            ON sr.recurso_id = r.id\n\n        WHERE sr.servico_id = h.servico_id\n          AND r.empresa_id = h.empresa_id\n          AND r.ativo = TRUE\n\n          AND NOT EXISTS (\n              SELECT 1\n\n              FROM agendamentos a\n\n              JOIN servicos s\n                  ON s.id = a.servico_id\n\n              WHERE a.recurso_id = r.id\n                AND a.data = h.data_agendamento\n                AND a.status = 'agendado'\n\n                AND (\n                    h.horario\n                    <\n                    a.horario\n                    + make_interval(\n                        mins => s.duracao_minutos\n                    )\n\n                    AND\n\n                    h.horario\n                    + make_interval(\n                        mins => h.duracao_minutos\n                    )\n                    >\n                    a.horario\n                )\n          )\n\n        ORDER BY r.id\n        LIMIT 1\n    ) AS recurso_id\n\nFROM horarios_sem_bloqueio h\n\nWHERE EXISTS (\n    SELECT 1\n\n    FROM recursos r\n\n    JOIN servico_recursos sr\n        ON sr.recurso_id = r.id\n\n    WHERE sr.servico_id = h.servico_id\n      AND r.empresa_id = h.empresa_id\n      AND r.ativo = TRUE\n\n      AND NOT EXISTS (\n          SELECT 1\n\n          FROM agendamentos a\n\n          JOIN servicos s\n              ON s.id = a.servico_id\n\n          WHERE a.recurso_id = r.id\n            AND a.data = h.data_agendamento\n            AND a.status = 'agendado'\n\n            AND (\n                h.horario\n                <\n                a.horario\n                + make_interval(\n                    mins => s.duracao_minutos\n                )\n\n                AND\n\n                h.horario\n                + make_interval(\n                    mins => h.duracao_minutos\n                )\n                >\n                a.horario\n            )\n      )\n)\n\nORDER BY h.horario\n\nLIMIT 3;",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Preparar agendamento\"].json.data}}\n\n$2 = {{$node[\"Preparar agendamento\"].json.empresa_id}}\n\n$3 = {{$node[\"Preparar agendamento\"].json.horario}}\n\n$4 = {{$node[\"Buscar serviço agendamento\"].json.duracao_minutos}}\n\n$5 = {{$node[\"Buscar serviço agendamento\"].json.id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3776,
+        528
+      ],
+      "id": "259305e7-9957-46cc-aef1-3a3dd9773413",
+      "name": "Buscar próximos horários",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const itens = $input.all();\n\nconst opcoes = itens\n  .filter(item => item.json.horario && item.json.recurso_id)\n  .map(item => ({\n    horario: String(item.json.horario).substring(0, 5),\n    recurso_id: item.json.recurso_id\n  }));\n\nreturn [{\n  json: {\n    opcoes,\n    horarios: opcoes.map(opcao => opcao.horario),\n    textoHorarios: opcoes\n      .map(opcao => opcao.horario)\n      .join(\", \"),\n    encontrouHorarios: opcoes.length > 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3968,
+        528
+      ],
+      "id": "36fa4dad-47dc-4b1b-9dff-6aca3493bfd1",
+      "name": "Montar horários sugeridos"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO contexto_conversa (\n    empresa_id,\n    cliente_id,\n    intencao,\n    servico,\n    data,\n    horario,\n    aguardando\n)\nVALUES (\n    $1,\n    $2,\n    'AGENDAMENTO',\n    $3,\n    $4,\n    $5,\n    'NOVO_HORARIO'\n)\n\nON CONFLICT (empresa_id, cliente_id)\n\nDO UPDATE SET\n    intencao = EXCLUDED.intencao,\n    servico = EXCLUDED.servico,\n    data = EXCLUDED.data,\n    horario = EXCLUDED.horario,\n    aguardando = EXCLUDED.aguardando,\n    atualizado_em = CURRENT_TIMESTAMP\n\nRETURNING *;",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Interpretar JSON\"].json.empresa_id}}  \n$2 = {{$node[\"Cliente agendamento\"].json.id}}  \n$3 = {{$node[\"Preparar agendamento\"].json.servico}}  \n$4 = {{$node[\"Preparar agendamento\"].json.data}}  \n$5 = {{$node[\"Preparar agendamento\"].json.horario}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        4416,
+        528
+      ],
+      "id": "9736399c-3fea-4e05-9692-c54780324ffd",
+      "name": "Salvar contexto agendamento",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    cc.id,\n    cc.empresa_id,\n    cc.cliente_id,\n    cc.intencao,\n    cc.servico,\n    cc.data,\n    cc.horario,\n    cc.aguardando,\n    cc.atualizado_em\nFROM contexto_conversa cc\n\nJOIN clientes c\n    ON c.id = cc.cliente_id\n\nWHERE cc.empresa_id = $1\n  AND c.telefone = $2\n  AND cc.aguardando IS NOT NULL\n\nORDER BY cc.atualizado_em DESC\n\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Interpretar JSON\"].json.empresa_id}}\n$2 = {{$node[\"Interpretar JSON\"].json.telefone}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        640,
+        64
+      ],
+      "id": "a3762f4a-483e-4ca1-9be4-1c770f5858f7",
+      "name": "Buscar contexto pendente",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const atual = $(\"Interpretar JSON\").first().json;\n\nlet contexto = {};\n\ntry {\n  contexto = $(\"Buscar contexto pendente\").first().json || {};\n} catch {\n  contexto = {};\n}\n\nlet intencao = atual.intencao;\nlet servico = atual.servico;\nlet data = atual.data;\nlet horario = atual.horario;\n\nconst aguardando = contexto.aguardando || null;\n\n\n// Normaliza mensagem\nconst texto = atual.mensagem\n  .toLowerCase()\n  .trim();\n\n\n// Detecta se a mensagem é basicamente SÓ um horário:\n//\n// 17h\n// 17h30\n// 17:30\n// 18\n//\n// Mas NÃO:\n// \"Quanto custa o alinhamento?\"\n// \"Vocês abrem sábado?\"\n\nconst respostaSomenteHorario = /^\\s*([01]?\\d|2[0-3])(?::([0-5]\\d)|h(?:([0-5]\\d))?)?\\s*$/.test(texto);\n\n\n// ========================================\n// CONTINUAR AGENDAMENTO\n// ========================================\n\nif (\n  aguardando === \"NOVO_HORARIO\" &&\n  respostaSomenteHorario &&\n  horario\n) {\n\n  intencao = \"AGENDAMENTO\";\n\n  servico = contexto.servico;\n\n  data = contexto.data;\n\n}\n\n\n// ========================================\n// RESULTADO\n// ========================================\n\nreturn [{\n  json: {\n    empresa_id: atual.empresa_id,\n\n    nome: atual.nome,\n    telefone: atual.telefone,\n    mensagem: atual.mensagem,\n\n    intencao,\n    servico,\n    data,\n    horario,\n\n    contexto_encontrado: Boolean(contexto.aguardando),\n    aguardando,\n\n    continuacao_agendamento:\n      aguardando === \"NOVO_HORARIO\" &&\n      respostaSomenteHorario &&\n      Boolean(horario)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        64
+      ],
+      "id": "4aa3441e-17fa-4899-a00e-ff780eddbe7f",
+      "name": "Resolver contexto conversa"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE contexto_conversa cc\nSET\n    aguardando = NULL,\n    atualizado_em = CURRENT_TIMESTAMP\nFROM clientes c\nWHERE cc.cliente_id = c.id\n  AND cc.empresa_id = $1\n  AND c.telefone = $2\nRETURNING cc.*;",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Preparar agendamento\"].json.empresa_id}}\n$2 = {{$node[\"Preparar agendamento\"].json.telefone}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3936,
+        336
+      ],
+      "id": "8a1f1973-9a21-4dc3-b627-aa30ec731702",
+      "name": "Finalizar contexto",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const dados = $(\"Preparar agendamento\").first().json;\nconst servico = $(\"Buscar serviço agendamento\").first().json;\nconst expediente = $(\"Buscar expediente\").first().json;\n\nif (!expediente || expediente.ativo !== true) {\n  return [{\n    json: {\n      ...dados,\n      horario_valido: false,\n      motivo: \"EMPRESA_FECHADA\",\n      duracao_minutos: Number(servico.duracao_minutos)\n    }\n  }];\n}\n\nconst [horaInicio, minutoInicio] =\n  dados.horario.split(\":\").map(Number);\n\nconst [horaAbertura, minutoAbertura] =\n  expediente.abertura.split(\":\").map(Number);\n\nconst [horaFechamento, minutoFechamento] =\n  expediente.fechamento.split(\":\").map(Number);\n\nconst inicioServico =\n  horaInicio * 60 + minutoInicio;\n\nconst fimServico =\n  inicioServico + Number(servico.duracao_minutos);\n\nconst abertura =\n  horaAbertura * 60 + minutoAbertura;\n\nconst fechamento =\n  horaFechamento * 60 + minutoFechamento;\n\nconst valido =\n  inicioServico >= abertura &&\n  fimServico <= fechamento;\n\nreturn [{\n  json: {\n    ...dados,\n\n    horario_valido: valido,\n\n    motivo: valido\n      ? null\n      : \"FORA_DO_EXPEDIENTE\",\n\n    duracao_minutos:\n      Number(servico.duracao_minutos),\n\n    abertura: expediente.abertura,\n    fechamento: expediente.fechamento\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        384
+      ],
+      "id": "ab42bfc9-e405-4cd0-a907-678ab9e1406c",
+      "name": "Validar horário comercial"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0fd0c64c-0024-41e5-9c16-54868052f5ab",
+              "leftValue": "={{$json.horario_valido}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2704,
+        384
+      ],
+      "id": "16528755-bcf4-4525-9cdb-ce9e9994cbd5",
+      "name": "Dentro do expediente?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const dados = $(\"Validar horário comercial\").first().json;\nconst empresa = $(\"Buscar empresa\").first().json;\n\nlet explicacao;\n\nif (dados.motivo === \"EMPRESA_FECHADA\") {\n  explicacao =\n    \"A empresa não realiza atendimentos nesse dia.\";\n} else {\n  explicacao =\n    `O serviço não cabe dentro do expediente desse dia, que vai de ${dados.abertura} até ${dados.fechamento}.`;\n}\n\nconst prompt = `Você é o atendente virtual da ${empresa.nome}.\n\nO cliente tentou agendar:\n\nServiço: ${dados.servico}\nData: ${dados.data}\nHorário: ${dados.horario}\nDuração: ${dados.duracao_minutos} minutos\n\n${explicacao}\n\nREGRAS:\n- Explique de forma curta e educada.\n- Não diga que o agendamento foi realizado.\n- Não invente horários.\n- Peça que o cliente escolha outro horário ou outro dia.\n\nResponda somente ao cliente.`;\n\nreturn [{\n  json: {\n    prompt,\n    rota: \"AGENDAMENTO_FORA_EXPEDIENTE\",\n    salvarHistorico: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3024,
+        672
+      ],
+      "id": "5d515e70-1672-4352-933e-0c40c1e7ed6c",
+      "name": "Preparar Prompt - Fora do expediente"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "13e38cef-1521-4ed0-bd94-03cb8cd7f9da",
+              "leftValue": "={{$json.encontrouHorarios}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4176,
+        528
+      ],
+      "id": "6ca38b5e-df63-4210-9ee7-70cb9f375865",
+      "name": "Encontrou horários?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const dados = $(\"Preparar agendamento\").first().json;\nconst empresa = $(\"Buscar empresa\").first().json;\n\nconst prompt = `Você é o atendente virtual da ${empresa.nome}.\n\nO cliente tentou agendar:\n\nServiço: ${dados.servico}\nData: ${dados.data}\nHorário solicitado: ${dados.horario}\n\nO sistema verificou a agenda e não encontrou outro horário disponível depois desse horário no mesmo dia.\n\nREGRAS:\n- Informe isso de forma curta e educada.\n- Não invente horários.\n- Não diga que houve agendamento.\n- Peça ao cliente que escolha outro dia.\n- Não se apresente novamente.\n\nResponda somente ao cliente.`;\n\nreturn [{\n  json: {\n    prompt,\n    rota: \"AGENDAMENTO_SEM_HORARIOS\",\n    salvarHistorico: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5392,
+        688
+      ],
+      "id": "72ab945d-6272-4270-ab6f-0cf8f1180659",
+      "name": "Preparar Prompt - Sem horários"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    dia_semana,\n    abertura,\n    fechamento,\n    ativo\nFROM horarios_empresa\nWHERE empresa_id = $1\nAND dia_semana = EXTRACT(DOW FROM $2::date)::int\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Preparar agendamento\"].json.empresa_id}}  \n$2 = {{$node[\"Preparar agendamento\"].json.data}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2256,
+        384
+      ],
+      "id": "57122768-d7f5-4389-a384-b52ac101cfeb",
+      "name": "Buscar expediente",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*)::int AS quantidade\nFROM bloqueios_agenda b\n\nWHERE b.empresa_id = $1\n  AND b.data = $2::date\n\n  AND (\n      b.dia_inteiro = TRUE\n\n      OR\n\n      (\n          b.horario_inicio\n          <\n          $3::time\n          + make_interval(mins => $4::int)\n\n          AND\n\n          b.horario_fim\n          >\n          $3::time\n      )\n  );",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Preparar agendamento\"].json.empresa_id}}\n$2 = {{$node[\"Preparar agendamento\"].json.data}}\n$3 = {{$node[\"Preparar agendamento\"].json.horario}}\n$4 = {{$node[\"Buscar serviço agendamento\"].json.duracao_minutos}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2928,
+        384
+      ],
+      "id": "e9d05305-7479-4038-9470-a969579dae80",
+      "name": "Verificar bloqueio",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ca25c0c4-96d7-47ce-becf-491ac0f88f3c",
+              "leftValue": "={{$json.quantidade}}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3152,
+        384
+      ],
+      "id": "798c783c-6781-4f15-bc4d-9f7b493740ad",
+      "name": "Está bloqueado?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    motivo,\n    dia_inteiro,\n    horario_inicio,\n    horario_fim\nFROM bloqueios_agenda b\n\nWHERE b.empresa_id = $1\n  AND b.data = $2::date\n\n  AND (\n      b.dia_inteiro = TRUE\n\n      OR\n\n      (\n          b.horario_inicio\n          <\n          $3::time\n          + make_interval(mins => $4::int)\n\n          AND\n\n          b.horario_fim\n          >\n          $3::time\n      )\n  )\n\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Preparar agendamento\"].json.empresa_id}} \n$2 = {{$node[\"Preparar agendamento\"].json.data}} \n$3 = {{$node[\"Preparar agendamento\"].json.horario}} \n$4 = {{$node[\"Buscar serviço agendamento\"].json.duracao_minutos}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3376,
+        256
+      ],
+      "id": "42a94dab-914e-46d3-9a10-8d2020c53806",
+      "name": "Buscar motivo bloqueio",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const dados = $(\"Preparar agendamento\").first().json;\nconst bloqueio = $(\"Buscar motivo bloqueio\").first().json;\nconst empresa = $(\"Buscar empresa\").first().json;\n\nlet informacao;\n\nif (bloqueio.dia_inteiro === true) {\n  informacao = `Não haverá atendimento nessa data. Motivo: ${bloqueio.motivo || \"agenda indisponível\"}.`;\n} else {\n  informacao = `Existe um bloqueio de ${String(bloqueio.horario_inicio).substring(0, 5)} até ${String(bloqueio.horario_fim).substring(0, 5)}. Motivo: ${bloqueio.motivo || \"agenda indisponível\"}.`;\n}\n\nconst prompt = `Você é o atendente virtual da ${empresa.nome}.\n\nO cliente tentou agendar:\n\nServiço: ${dados.servico}\nData: ${dados.data}\nHorário: ${dados.horario}\n\n${informacao}\n\nREGRAS:\n- Informe educadamente que esse período não está disponível.\n- Não diga que o agendamento foi realizado.\n- Não invente horários.\n- Peça que o cliente escolha outro horário ou outra data.\n- Seja curto e natural.\n\nResponda somente ao cliente.`;\n\nreturn [{\n  json: {\n    prompt,\n    rota: \"AGENDAMENTO_BLOQUEADO\",\n    salvarHistorico: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3584,
+        256
+      ],
+      "id": "cd5c8e03-84cf-4b63-8d99-2f9f5175ba6f",
+      "name": "Preparar Prompt - Bloqueio"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    r.id,\n    r.nome,\n    r.tipo\nFROM recursos r\n\nJOIN servico_recursos sr\n    ON sr.recurso_id = r.id\n\nWHERE sr.servico_id = $1\n  AND r.empresa_id = $2\n  AND r.ativo = TRUE\n\nAND NOT EXISTS (\n    SELECT 1\n\n    FROM agendamentos a\n\n    JOIN servicos s\n        ON s.id = a.servico_id\n\n    WHERE a.recurso_id = r.id\n      AND a.data = $3::date\n      AND a.status = 'agendado'\n\n      AND (\n          $4::time\n          <\n          a.horario\n          + make_interval(mins => s.duracao_minutos)\n\n          AND\n\n          $4::time\n          + make_interval(mins => $5::int)\n          >\n          a.horario\n      )\n)\n\nORDER BY r.id\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "=$1 = {{$node[\"Buscar serviço agendamento\"].json.id}}  \n$2 = {{$node[\"Preparar agendamento\"].json.empresa_id}}  \n$3 = {{$node[\"Preparar agendamento\"].json.data}}  \n$4 = {{$node[\"Preparar agendamento\"].json.horario}}  \n$5 = {{$node[\"Buscar serviço agendamento\"].json.duracao_minutos}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3344,
+        480
+      ],
+      "id": "3310cad7-d1c0-498d-a1ae-f101e3be41ab",
+      "name": "Buscar recurso disponível",
+      "credentials": {
+        "postgres": {
+          "id": "py4QPTOk2Hc6ylxh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "59a8790a-ed4e-497e-91db-b674fcdd6eb7",
+              "leftValue": "={{$json.id}}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3536,
+        480
+      ],
+      "id": "7ce1d79b-5c86-4c9b-b266-b5750666074d",
+      "name": "Recurso disponível?"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "IA - Interpretar mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cadastrar cliente": {
+      "main": [
+        [
+          {
+            "node": "Buscar último serviço",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar mensagem cliente": {
+      "main": [
+        [
+          {
+            "node": "Buscar histórico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar serviço": {
+      "main": [
+        [
+          {
+            "node": "Preparar Prompt - Preço",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar histórico": {
+      "main": [
+        [
+          {
+            "node": "Montar histórico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar histórico": {
+      "main": [
+        [
+          {
+            "node": "Buscar serviço",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar último serviço": {
+      "main": [
+        [
+          {
+            "node": "Resolver contexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolver contexto": {
+      "main": [
+        [
+          {
+            "node": "Salvar mensagem cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Direcionar atendimento": {
+      "main": [
+        [
+          {
+            "node": "Cadastrar cliente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Prompt - Horário",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Listar serviços",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar atendimento humano",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Prompt - Geral",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar resposta - Endereço",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar agendamento": {
+      "main": [
+        [
+          {
+            "node": "Dados completos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dados completos?": {
+      "main": [
+        [
+          {
+            "node": "Cliente agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Prompt - Pedir dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cliente agendamento": {
+      "main": [
+        [
+          {
+            "node": "Buscar serviço agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar serviço agendamento": {
+      "main": [
+        [
+          {
+            "node": "Buscar expediente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar agendamento": {
+      "main": [
+        [
+          {
+            "node": "Finalizar contexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listar serviços": {
+      "main": [
+        [
+          {
+            "node": "Montar lista serviços",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar lista serviços": {
+      "main": [
+        [
+          {
+            "node": "Resposta Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar atendimento humano": {
+      "main": [
+        [
+          {
+            "node": "Cliente - Humano",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cliente - Humano": {
+      "main": [
+        [
+          {
+            "node": "Registrar solicitação humana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar solicitação humana": {
+      "main": [
+        [
+          {
+            "node": "Responder cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Prompt - Horário": {
+      "main": [
+        [
+          {
+            "node": "IA Central - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA Central - Ollama": {
+      "main": [
+        [
+          {
+            "node": "Padronizar resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Padronizar resposta": {
+      "main": [
+        [
+          {
+            "node": "Salvar no histórico?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Prompt - Geral": {
+      "main": [
+        [
+          {
+            "node": "IA Central - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Prompt - Preço": {
+      "main": [
+        [
+          {
+            "node": "IA Central - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar no histórico?": {
+      "main": [
+        [
+          {
+            "node": "Salvar resposta no histórico",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resposta Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar resposta no histórico": {
+      "main": [
+        [
+          {
+            "node": "Restaurar resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Prompt - Pedir dados": {
+      "main": [
+        [
+          {
+            "node": "IA Central - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Prompt - Horário ocupado": {
+      "main": [
+        [
+          {
+            "node": "IA Central - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Prompt - Confirmar agendamento": {
+      "main": [
+        [
+          {
+            "node": "IA Central - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA - Interpretar mensagem": {
+      "main": [
+        [
+          {
+            "node": "Interpretar JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretar JSON": {
+      "main": [
+        [
+          {
+            "node": "Buscar empresa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar empresa": {
+      "main": [
+        [
+          {
+            "node": "Buscar contexto pendente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar resposta - Endereço": {
+      "main": [
+        [
+          {
+            "node": "Resposta Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restaurar resposta": {
+      "main": [
+        [
+          {
+            "node": "Resposta Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar próximos horários": {
+      "main": [
+        [
+          {
+            "node": "Montar horários sugeridos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar horários sugeridos": {
+      "main": [
+        [
+          {
+            "node": "Encontrou horários?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar contexto agendamento": {
+      "main": [
+        [
+          {
+            "node": "Preparar Prompt - Horário ocupado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar contexto pendente": {
+      "main": [
+        [
+          {
+            "node": "Resolver contexto conversa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolver contexto conversa": {
+      "main": [
+        [
+          {
+            "node": "Direcionar atendimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalizar contexto": {
+      "main": [
+        [
+          {
+            "node": "Preparar Prompt - Confirmar agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar horário comercial": {
+      "main": [
+        [
+          {
+            "node": "Dentro do expediente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dentro do expediente?": {
+      "main": [
+        [
+          {
+            "node": "Verificar bloqueio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Prompt - Fora do expediente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Prompt - Fora do expediente": {
+      "main": [
+        [
+          {
+            "node": "IA Central - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encontrou horários?": {
+      "main": [
+        [
+          {
+            "node": "Salvar contexto agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Prompt - Sem horários",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Prompt - Sem horários": {
+      "main": [
+        [
+          {
+            "node": "IA Central - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar expediente": {
+      "main": [
+        [
+          {
+            "node": "Validar horário comercial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar bloqueio": {
+      "main": [
+        [
+          {
+            "node": "Está bloqueado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Está bloqueado?": {
+      "main": [
+        [
+          {
+            "node": "Buscar motivo bloqueio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar recurso disponível",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar motivo bloqueio": {
+      "main": [
+        [
+          {
+            "node": "Preparar Prompt - Bloqueio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Prompt - Bloqueio": {
+      "main": [
+        [
+          {
+            "node": "IA Central - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar recurso disponível": {
+      "main": [
+        [
+          {
+            "node": "Recurso disponível?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recurso disponível?": {
+      "main": [
+        [
+          {
+            "node": "Criar agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar próximos horários",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "25e44c8b-a77a-45c5-90ac-df1cd8c12930",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "129b3708a813bd73faaf0661eb856a8be65d7e92981776707d1ee7adb2e1dfd5"
+  },
+  "nodeGroups": [],
+  "id": "RQysZZrZKiA4irLB",
+  "tags": []
+}
